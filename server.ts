@@ -8,6 +8,23 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 import exportRoutes from "./routes/exportRoutes";
 import reportRoutes from "./routes/reportRoutes";
 import transactionRoutes from "./routes/transactionRoutes";
+import mysql from "mysql2";
+
+const db = mysql.createConnection({
+  host: "localhost",
+  user: "gelirtakibi_user",
+  password: "SIFRENIZ",
+  database: "gelirtakibi_db"
+});
+
+db.connect((err) => {
+  if (err) {
+    console.log("Database bağlantı hatası:", err);
+  } else {
+    console.log("Database bağlandı");
+  }
+});
+
 
 dotenv.config();
 
