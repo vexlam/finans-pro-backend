@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. KULLANICI
+model User {
+  id            String            @id @default(uuid())
+  email         String            @unique
+  passwordHash  String
+  firstName     String?
+  lastName      String?
+  createdAt     DateTime          @default(now())
+  
+  // İlişkiler
+  workspaces    WorkspaceMember[]
+}
+
+// 2. ÇALIŞMA ALANI (Örn: "Gelişimsport" veya "Ev Bütçesi")
+model Workspace {
+  id            String             @id @default(uuid())
+  name          String
+  createdAt     DateTime           @default(now())
+
+  // Bu alana bağlı her şey
+  members       WorkspaceMember[]
+  accounts      Account[]
+  categories    Category[]
+  transactions  Transaction[]
+}
+
+// 3. ÜYELİK VE YETKİ (Kim hangi alana girebilir?)
+model WorkspaceMember {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  userId        String
+  role          String    @default("ADMIN") // ADMIN, MEMBER
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+// 4. HESAPLAR (Banka, Nakit, Gümüş Portföyü)
+model Account {
+  id            String        @id @default(uuid())
+  workspaceId   String
+  name          String
+  type          String        // BANK, CASH, INVESTMENT
+  currency      String        @default("TRY") // USD, TRY, XAG
+  balance       Float         @default(0)
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id])
+  transactions  Transaction[]
+}
+
+// 5. KATEGORİLER (E-ticaret Gideri, Freelance Geliri vb.)
+model Category {
+  id            String        @id @default(uuid())
+  workspaceId   String
+  name          String
+  type          String        // INCOME, EXPENSE
+  color         String?
+
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id])
+  transactions  Transaction[]
+}
+
+// 6. İŞLEMLER (Gelir ve Gider Kayıtları)
+model Transaction {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  accountId     String
+  categoryId    String?
+  type          String    // INCOME, EXPENSE
+  amount        Float
+  currency      String
+  exchangeRate  Float     @default(1.0) // Dolar bazlı hesaplar için kritik
+  date          DateTime  @default(now())
+  description   String?
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id])
+  account       Account   @relation(fields: [accountId], references: [id])
+  category      Category? @relation(fields: [categoryId], references: [id])
+}
