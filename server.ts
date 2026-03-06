@@ -1,19 +1,25 @@
 import express from "express";
 import cors from "cors";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
 
-const prisma = new PrismaClient();
+import authRoutes from "./routes/authRoutes";
+import categoryRoutes from "./routes/categoryRoutes";
+import dashboardRoutes from "./routes/dashboardRoutes";
+import exportRoutes from "./routes/exportRoutes";
+import reportRoutes from "./routes/reportRoutes";
+import transactionRoutes from "./routes/transactionRoutes";
+
+dotenv.config();
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-const JWT_SECRET = process.env.JWT_SECRET || "super-secret-key";
 const PORT = process.env.PORT || 3000;
 
 /* ROOT TEST */
+
 app.get("/", (req, res) => {
   res.json({
     status: "ok",
@@ -23,100 +29,81 @@ app.get("/", (req, res) => {
 });
 
 /* HEALTH CHECK */
+
 app.get("/health", (req, res) => {
-  res.json({ status: "healthy" });
+  res.json({
+    status: "healthy",
+    uptime: process.uptime()
+  });
 });
 
-/* REGISTER */
-app.post("/register", async (req, res) => {
-  try {
-    const { email, password, firstName } = req.body;
+/* API ROUTES */
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email ve şifre gerekli" });
-    }
+app.use("/auth", authRoutes);
 
-    const passwordHash = await bcrypt.hash(password, 10);
+app.use("/categories", categoryRoutes);
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        firstName
-      }
-    });
+app.use("/dashboard", dashboardRoutes);
 
-    res.json({
-      message: "Kullanıcı oluşturuldu",
-      userId: user.id
-    });
+app.use("/reports", reportRoutes);
 
-  } catch (error) {
-    res.status(400).json({
-      error: "Email zaten kayıtlı olabilir"
-    });
-  }
+app.use("/transactions", transactionRoutes);
+
+app.use("/export", exportRoutes);
+
+/* 404 HANDLER */
+
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Endpoint bulunamadı"
+  });
 });
 
-/* LOGIN */
-app.post("/login", async (req, res) => {
-  try {
+/* GLOBAL ERROR HANDLER */
 
-    const { email, password } = req.body;
+app.use((err: any, req: any, res: any, next: any) => {
 
-    const user = await prisma.user.findUnique({
-      where: { email }
-    });
+  console.error("Server error:", err);
 
-    if (!user) {
-      return res.status(401).json({ error: "Kullanıcı bulunamadı" });
-    }
+  res.status(500).json({
+    error: "Sunucu hatası oluştu"
+  });
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
-
-    if (!valid) {
-      return res.status(401).json({ error: "Hatalı şifre" });
-    }
-
-    const token = jwt.sign(
-      { userId: user.id },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.json({
-      token,
-      user: {
-        email: user.email,
-        firstName: user.firstName
-      }
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      error: "Giriş yapılırken hata oluştu"
-    });
-  }
-});
-
-/* DASHBOARD */
-app.get("/dashboard", async (req, res) => {
-  try {
-
-    const accounts = await prisma.account.findMany();
-
-    res.json({
-      accounts
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      error: "Dashboard verisi alınamadı"
-    });
-  }
 });
 
 /* SERVER START */
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+
+  console.log(`
+🚀 FinansPro Backend Başladı
+Port: ${PORT}
+Mode: ${process.env.NODE_ENV || "development"}
+`);
+
 });
+
+
+async function createAdmin() {
+
+  const existing = await prisma.user.findUnique({
+    where: { email: "admin@gelirtakibi.com" }
+  });
+
+  if (!existing) {
+
+    const passwordHash = await bcrypt.hash("123456", 10);
+
+    await prisma.user.create({
+      data: {
+        email: "admin@gelirtakibi.com",
+        passwordHash,
+        firstName: "Admin"
+      }
+    });
+
+    console.log("Admin user created");
+  }
+}
+
+createAdmin();
